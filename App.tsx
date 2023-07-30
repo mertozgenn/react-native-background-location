@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import {
   Alert,
+  Platform,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -26,21 +28,29 @@ import BackgroundGeolocation, {
   Subscription
 } from "react-native-background-geolocation";
 
+interface ApiLocation {
+  id: number;
+  latitude: number;
+  longitude: number;
+  timestamp: Date;
+  user: string;
+}
+
 function App(): JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
   const [enabled, setEnabled] = React.useState(false);
-  const [location, setLocation] = React.useState('');
+  const [locations, setLocations] = React.useState([] as ApiLocation[]);
+  const [refreshing, setRefreshing] = React.useState(false);
 
   useEffect(() => {
     const onHttp = BackgroundGeolocation.onHttp(httpEvent => {
       console.log("[http] ", httpEvent.responseText);
     });
 
-
     /// 2. ready the plugin.
     BackgroundGeolocation.ready({
       desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-      distanceFilter: 0,
+      distanceFilter: 1000,
+      disableElasticity: true,
       stopTimeout: 5,
       debug: true, // <-- enable this hear sounds for background-geolocation life-cycle.
       logLevel: BackgroundGeolocation.LOG_LEVEL_VERBOSE,
@@ -67,14 +77,16 @@ function App(): JSX.Element {
       headers: {              // <-- Optional HTTP headers
         "Content-Type": "application/json"
       },
-      //params: {               // <-- Optional HTTP params
-        //"auth_token": "maybe_your_server_authenticates_via_token_YES?"
-      //}
+      params: {               // <-- Optional HTTP params
+        "user": Platform.OS == "android" ? "burak" : "mert"
+      }
     }).then((state) => {
       setEnabled(state.enabled)
       BackgroundGeolocation.start();
       console.log("- BackgroundGeolocation is configured and ready: ", state.enabled);
     });
+
+    getLocations()
 
     return () => {
       // Remove BackgroundGeolocation event-subscribers when the View is removed or refreshed
@@ -91,21 +103,51 @@ function App(): JSX.Element {
       BackgroundGeolocation.start();
     } else {
       BackgroundGeolocation.stop();
-      setLocation('');
     }
   }, [enabled]);
+
+  const getLocations = async () => {
+    const apiResult = await fetch('https://gpstest.mertozgen.com.tr/weatherforecast/gps?apiKey=enaz18cmolmalı')
+    const data = await apiResult.json() as ApiLocation[]
+    setLocations(data)
+  }
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    getLocations().then(() => setRefreshing(false))
+  }, []);
 
 
   return (
     <SafeAreaView>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
-      <ScrollView contentInsetAdjustmentBehavior="automatic">
-        <Text>Konum Test</Text>
+      <StatusBar/>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{padding: 20}}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      }>
+        {locations.map((location, index) => (
+          <View key={index} style={{marginBottom: 10}}>
+            <Text style={styles.text}>İd: {location.id}</Text>
+            <Text style={styles.text}>User: {location.user}</Text>
+            <Text style={styles.text}>Lat: {location.latitude}</Text>
+            <Text style={styles.text}>Lng: {location.longitude}</Text>
+            <Text style={styles.text}>Date: {location.timestamp.toString()}</Text>
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  text: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'black',
+  },
+});
 
 export default App;
