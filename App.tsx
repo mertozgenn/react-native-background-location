@@ -8,6 +8,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useColorScheme,
   View,
 } from 'react-native';
@@ -46,6 +47,15 @@ function App(): JSX.Element {
       console.log("[http] ", httpEvent.responseText);
     });
 
+    BackgroundGeolocation.onEnabledChange((enabled) => {
+      console.log("[onEnabledChange] enabled:", enabled);
+      setEnabled(enabled)
+    });
+
+    BackgroundGeolocation.onLocation((location: Location) => {
+      console.log("[location] ", location);
+    });
+
     /// 2. ready the plugin.
     BackgroundGeolocation.ready({
       desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
@@ -81,9 +91,9 @@ function App(): JSX.Element {
         "user": Platform.OS == "android" ? "burak" : "mert"
       }
     }).then((state) => {
-      setEnabled(state.enabled)
-      BackgroundGeolocation.start();
       console.log("- BackgroundGeolocation is configured and ready: ", state.enabled);
+    }).catch((error) => {
+      console.log("BackgroundGeolocation error", error);
     });
 
     getLocations()
@@ -96,15 +106,39 @@ function App(): JSX.Element {
     }
   }, []);
 
+  const enable = () => {
+    console.log("enable")
+    BackgroundGeolocation.start(
+      (state) => {
+        Alert.alert("Sistem durumu", state.enabled ? "Açık" : "Kapalı")
+        setEnabled(true)
+      },
+      (error) => {
+        Alert.alert("Sistem durumu", error)
+      }
+    );
+  }
 
-  /// 3. start / stop BackgroundGeolocation
-  React.useEffect(() => {
-    if (enabled) {
-      BackgroundGeolocation.start();
+  const disable = () => {
+    console.log("disable")
+    BackgroundGeolocation.stop(
+      (state) => {
+        Alert.alert("Sistem durumu", state.enabled ? "Açık" : "Kapalı")
+        setEnabled(false)
+      },
+      (error) => {
+        Alert.alert("Sistem durumu", error)
+      }
+    )
+  }
+
+  const buttonClicked = () => {
+    if (enabled) {  
+      disable()
     } else {
-      BackgroundGeolocation.stop();
+      enable()
     }
-  }, [enabled]);
+  }
 
   const getLocations = async () => {
     const apiResult = await fetch('https://gpstest.mertozgen.com.tr/weatherforecast/gps?apiKey=enaz18cmolmalı')
@@ -121,6 +155,12 @@ function App(): JSX.Element {
   return (
     <SafeAreaView>
       <StatusBar/>
+      <View>
+        <TouchableOpacity style={{backgroundColor: 'gray', marginTop: 10, alignItems: 'center'}} onPress={buttonClicked}>
+          <Text style={{fontSize: 20, fontWeight: 'bold', color: 'black', margin: 20}}>{enabled ? "Stop" : "Start"}</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={{fontSize: 20, fontWeight: 'bold', color: 'black', margin: 20}}>Konumlar:</Text>
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{padding: 20}}
       refreshControl={
         <RefreshControl
